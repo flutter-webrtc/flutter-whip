@@ -1,2 +1,3 @@
 # flutter-whip
-WebRTC-HTTP ingestion protocol (WHIP) for flutter
+
+WebRTC-HTTP ingestion protocol (WHIP) library for flutter.
