@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_cisco_meeting/src/utils.dart';
+import 'package:flutter_whip/src/utils.dart';
 import 'package:test/test.dart';
 
 void main() async {

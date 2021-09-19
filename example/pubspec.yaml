@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_icons: ^1.0.0
-  flutter_whip_meeting:
+  flutter_whip:
     path: ../
   
 dev_dependencies:
