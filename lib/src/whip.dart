@@ -1,5 +1,4 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:http/http.dart';
 
 import 'logger.dart';
 import 'stream.dart';
@@ -10,7 +9,6 @@ const API_CHANNEL = 'whip-api';
 
 class WHIP {
   Function(RTCTrackEvent)? onTrack;
-  Function(RTCDataChannel)? onDataChannel;
   Function()? onAPIOpen;
 
   late RTCPeerConnection pc;
@@ -21,17 +19,16 @@ class WHIP {
 
   void initlize() async {
     pc = await createPeerConnection({});
-
-    api = await pc.createDataChannel(
-        API_CHANNEL, RTCDataChannelInit()..maxRetransmits = 30);
-
     pc.onRenegotiationNeeded = onnegotiationneeded;
     pc.onIceCandidate = onicecandidate;
+    api = await pc.createDataChannel(
+        API_CHANNEL, RTCDataChannelInit()..maxRetransmits = 30);
     await pc.setLocalDescription(await pc.createOffer());
   }
 
   void close() async {
     await httpDelete(Uri.parse(url));
+    await pc.close();
   }
 
   Future<List<StatsReport>> getPubStats(MediaStreamTrack? selector) {
@@ -56,6 +53,7 @@ class WHIP {
         body: offer,
         headers: {'Content-Type': 'application/sdp'},
       );
+      // TODO(cloudwebrtc): handle answer sdp.
       //await pc.setRemoteDescription(answer.body);
     } catch (err, st) {
       log.error('onnegotiationneeded: e => ${err.toString()} $st');
@@ -70,7 +68,7 @@ class WHIP {
         headers: {'Content-Type': 'application/trickle-ice-sdpfrag'},
         body: candidate.toMap());
 
-    // TODO(cloudwebrtc): respose.statusCode
+    // TODO(cloudwebrtc): Add remote candidate to local pc.
   }
 
   void setPreferredCodec(RTCSessionDescription description) {
