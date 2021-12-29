@@ -8,8 +8,8 @@ Future<http.Response> httpPost(Uri url,
         {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
     http.post(url, headers: headers, body: body, encoding: encoding);
 
-
-Future<http.Response> httpPatch(Uri url, {Map<String, String>? headers, Object? body}) async {
+Future<http.Response> httpPatch(Uri url,
+    {Map<String, String>? headers, Object? body}) async {
   final response = await http.patch(url, headers: headers, body: body);
   print('Status code: ${response.statusCode}');
   print('Body: ${response.body}');

@@ -1,2 +1,2 @@
-export 'src/client.dart';
 export 'src/utils.dart';
+export 'src/whip.dart';
