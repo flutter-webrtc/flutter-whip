@@ -1,7 +1,7 @@
 #!/bin/bash
 
 FLUTTER_APP_FOLDER=$(cd `dirname $0`/../; pwd)
-FLUTTER_APP_ORG=com.cloudwebrtc.cisco-meeting
+FLUTTER_APP_ORG=com.cloudwebrtc.flutter-whip.example
 FLUTTER_APP_PROJECT_NAME=flutter_cisco_meeting_app
 CMD=$1
 
