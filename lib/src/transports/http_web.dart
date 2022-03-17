@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-void httpInit() {}
+void initHttpClient() {}
 
 Future<http.Response> httpPost(Uri url,
         {Map<String, String>? headers, Object? body, Encoding? encoding}) =>

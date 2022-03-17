@@ -1,4 +1,4 @@
-name: flutter_whip_exampl_app
+name: flutter_whip_example_app
 description: A new Flutter project.
 version: 1.0.0+1
 publish_to: none
@@ -13,6 +13,7 @@ dependencies:
   flutter_icons: ^1.0.0
   flutter_whip:
     path: ../
+  qr_code_scanner: ^0.7.0
   
 dev_dependencies:
   flutter_test:

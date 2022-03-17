@@ -2,7 +2,7 @@
 
 FLUTTER_APP_FOLDER=$(cd `dirname $0`/../; pwd)
 FLUTTER_APP_ORG=com.cloudwebrtc.flutter-whip.example
-FLUTTER_APP_PROJECT_NAME=flutter_cisco_meeting_app
+FLUTTER_APP_PROJECT_NAME=flutter_whip_example_app
 CMD=$1
 
 function cleanup() {
