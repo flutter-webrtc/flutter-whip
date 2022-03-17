@@ -1,4 +1,4 @@
-# flutter_cisco_meeting_example
+# flutter_whip_example
 
 A new Flutter project.
 
