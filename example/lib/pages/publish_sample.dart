@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_whip/flutter_whip.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'qr_scanner.dart';
 
@@ -17,21 +18,37 @@ class WhipPublishSample extends StatefulWidget {
 class _WhipPublishSampleState extends State<WhipPublishSample> {
   MediaStream? _localStream;
   final _localRenderer = RTCVideoRenderer();
-  List<MediaDeviceInfo>? _mediaDevicesList;
+  String stateStr = 'init';
   bool _connecting = false;
   late WHIP _whip;
-  String? url;
+
+  TextEditingController _serverController = TextEditingController();
+  late SharedPreferences _preferences;
 
   @override
   void initState() {
     super.initState();
     initRenderers();
+    _loadSettings();
+  }
+
+  void _loadSettings() async {
+    _preferences = await SharedPreferences.getInstance();
+    this.setState(() {
+      _serverController.text = _preferences.getString('pushserver') ??
+          'http://localhost:8080/whip/live/stream1';
+    });
   }
 
   @override
   void deactivate() {
     super.deactivate();
     _localRenderer.dispose();
+    _saveSettings();
+  }
+
+  void _saveSettings() {
+    _preferences.setString('pushserver', _serverController.text);
   }
 
   void initRenderers() async {
@@ -40,17 +57,45 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   void _connect() async {
-    if (url == null) {
+    final url = _serverController.text;
+
+    if (url.isEmpty) {
       return;
     }
 
-    _whip = WHIP(url: url!);
+    _whip = WHIP(url: url);
+
+    _whip.onState = (WhipState state) {
+      setState(() {
+        switch (state) {
+          case WhipState.kNew:
+            stateStr = 'New';
+            break;
+          case WhipState.kInitialized:
+            stateStr = 'Initialized';
+            break;
+          case WhipState.kConnecting:
+            stateStr = 'Connecting';
+            break;
+          case WhipState.kConnected:
+            stateStr = 'Connected';
+            break;
+          case WhipState.kDisconnected:
+            stateStr = 'Closed';
+            break;
+          case WhipState.kFailure:
+            stateStr = 'Failure: \n${_whip.lastError.toString()}';
+            break;
+        }
+      });
+    };
+
     final mediaConstraints = <String, dynamic>{
       'audio': true,
       'video': {
         'mandatory': {
-          'minWidth': '640',
-          'minHeight': '480',
+          'minWidth': '1280',
+          'minHeight': '720',
           'minFrameRate': '30',
         },
         'facingMode': 'user',
@@ -60,13 +105,14 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
 
     try {
       var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      _mediaDevicesList = await navigator.mediaDevices.enumerateDevices();
       _localStream = stream;
       _localRenderer.srcObject = _localStream;
       await _whip.initlize(mode: WhipMode.kSend, stream: _localStream);
       await _whip.connect();
     } catch (e) {
-      print(e.toString());
+      print('connect: error => ' + e.toString());
+      _localRenderer.srcObject = null;
+      _localStream?.dispose();
       return;
     }
     if (!mounted) return;
@@ -108,15 +154,17 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
           IconButton(
             icon: Icon(Icons.qr_code_scanner_sharp),
             onPressed: () async {
-              Future future = Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => QRViewExample()));
-
-              future.then((value) {
-                print('QR code result: $value');
-                this.setState(() {
-                  url = value;
+              if (!WebRTC.platformIsDesktop) {
+                /// only support mobile for now
+                Future future = Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => QRViewExample()));
+                future.then((value) {
+                  print('QR code result: $value');
+                  this.setState(() {
+                    _serverController.text = value;
+                  });
                 });
-              });
+              }
             },
           ),
         if (_connecting)
@@ -124,59 +172,61 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
             icon: Icon(Icons.switch_video),
             onPressed: _toggleCamera,
           ),
-        if (_connecting)
-          PopupMenuButton<String>(
-            onSelected: _selectAudioOutput,
-            itemBuilder: (BuildContext context) {
-              if (_mediaDevicesList != null) {
-                return _mediaDevicesList!
-                    .where((device) => device.kind == 'audiooutput')
-                    .map((device) {
-                  return PopupMenuItem<String>(
-                    value: device.deviceId,
-                    child: Text(device.label),
-                  );
-                }).toList();
-              }
-              return [];
-            },
-          ),
       ]),
       body: OrientationBuilder(
         builder: (context, orientation) {
           return Column(children: <Widget>[
-            FittedBox(
-              child: Text(
-                'URL: ${url ?? 'Not set, Please scan the QR code ...'}',
-                textAlign: TextAlign.left,
+            Column(children: <Widget>[
+              FittedBox(
+                child: Text(
+                  '${stateStr}',
+                  textAlign: TextAlign.left,
+                ),
               ),
-            ),
-            Center(
-              child: Container(
-                margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height - 110,
-                decoration: BoxDecoration(color: Colors.black54),
-                child: RTCVideoView(_localRenderer,
-                    mirror: true,
-                    objectFit:
-                        RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
-              ),
-            )
+              if (!_connecting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10.0, 18.0, 10.0, 0),
+                  child: Align(
+                    child: Text('WHIP URI:'),
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
+              if (!_connecting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0),
+                  child: TextFormField(
+                    controller: _serverController,
+                    keyboardType: TextInputType.text,
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.all(10.0),
+                      border: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.black12)),
+                    ),
+                  ),
+                )
+            ]),
+            if (_connecting)
+              Center(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height - 110,
+                  decoration: BoxDecoration(color: Colors.black54),
+                  child: RTCVideoView(_localRenderer,
+                      mirror: true,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+                ),
+              )
           ]);
         },
       ),
-      floatingActionButton: url != null
-          ? FloatingActionButton(
-              onPressed: _connecting ? _disconnect : _connect,
-              tooltip: _connecting ? 'Hangup' : 'Call',
-              child: Icon(_connecting ? Icons.call_end : Icons.phone),
-            )
-          : Container(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _connecting ? _disconnect : _connect,
+        tooltip: _connecting ? 'Hangup' : 'Call',
+        child: Icon(_connecting ? Icons.call_end : Icons.phone),
+      ),
     );
-  }
-
-  void _selectAudioOutput(String deviceId) {
-    _localRenderer.audioOutput(deviceId);
   }
 }

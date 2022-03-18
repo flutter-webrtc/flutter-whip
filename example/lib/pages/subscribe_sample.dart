@@ -1,9 +1,9 @@
 import 'dart:core';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_whip/flutter_whip.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'qr_scanner.dart';
 
@@ -18,18 +18,35 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
   final _remoteRenderer = RTCVideoRenderer();
   bool _connecting = false;
   late WHIP _whip;
-  String? url;
+  String stateStr = 'init';
+
+  TextEditingController _serverController = TextEditingController();
+  late SharedPreferences _preferences;
 
   @override
   void initState() {
     super.initState();
     initRenderers();
+    _loadSettings();
+  }
+
+  void _loadSettings() async {
+    _preferences = await SharedPreferences.getInstance();
+    this.setState(() {
+      _serverController.text = _preferences.getString('pullserver') ??
+          'http://localhost:8080/whip/live/stream1';
+    });
   }
 
   @override
   void deactivate() {
     super.deactivate();
     _remoteRenderer.dispose();
+    _saveSettings();
+  }
+
+  void _saveSettings() {
+    _preferences.setString('pullserver', _serverController.text);
   }
 
   void initRenderers() async {
@@ -38,10 +55,37 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   void _connect() async {
-    if (url == null) {
+    final url = _serverController.text;
+
+    if (url.isEmpty) {
       return;
     }
-    _whip = WHIP(url: url!);
+    _whip = WHIP(url: url);
+
+    _whip.onState = (WhipState state) {
+      setState(() {
+        switch (state) {
+          case WhipState.kNew:
+            stateStr = 'New';
+            break;
+          case WhipState.kInitialized:
+            stateStr = 'Initialized';
+            break;
+          case WhipState.kConnecting:
+            stateStr = 'Connecting';
+            break;
+          case WhipState.kConnected:
+            stateStr = 'Connected';
+            break;
+          case WhipState.kDisconnected:
+            stateStr = 'Closed';
+            break;
+          case WhipState.kFailure:
+            stateStr = 'Failure: \n${_whip.lastError.toString()}';
+            break;
+        }
+      });
+    };
     try {
       await _whip.initlize(mode: WhipMode.kReceive);
       _whip.onTrack = (event) {
@@ -51,7 +95,7 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
       };
       await _whip.connect();
     } catch (e) {
-      print(e.toString());
+      print('connect: error => ' + e.toString());
       return;
     }
     if (!mounted) return;
@@ -81,49 +125,74 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
           IconButton(
             icon: Icon(Icons.qr_code_scanner_sharp),
             onPressed: () async {
-              Future future = Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => QRViewExample()));
-
-              future.then((value) {
-                print('QR code result: $value');
-                this.setState(() {
-                  url = value;
+              if (!WebRTC.platformIsDesktop) {
+                /// only support mobile for now
+                Future future = Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => QRViewExample()));
+                future.then((value) {
+                  print('QR code result: $value');
+                  this.setState(() {
+                    _serverController.text = value;
+                  });
                 });
-              });
+              }
             },
           ),
       ]),
       body: OrientationBuilder(
         builder: (context, orientation) {
           return Column(children: <Widget>[
-            FittedBox(
-              child: Text(
-                'URL: ${url ?? 'Not set, Please scan the QR code ...'}',
-                textAlign: TextAlign.left,
+            Column(children: <Widget>[
+              FittedBox(
+                child: Text(
+                  '${stateStr}',
+                  textAlign: TextAlign.left,
+                ),
               ),
-            ),
-            Center(
-              child: Container(
-                margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height - 110,
-                decoration: BoxDecoration(color: Colors.black54),
-                child: RTCVideoView(_remoteRenderer,
-                    mirror: true,
-                    objectFit:
-                        RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
-              ),
-            )
+              if (!_connecting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10.0, 18.0, 10.0, 0),
+                  child: Align(
+                    child: Text('WHIP URI:'),
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
+              if (!_connecting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0),
+                  child: TextFormField(
+                    controller: _serverController,
+                    keyboardType: TextInputType.text,
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.all(10.0),
+                      border: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.black12)),
+                    ),
+                  ),
+                )
+            ]),
+            if (_connecting)
+              Center(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height - 110,
+                  decoration: BoxDecoration(color: Colors.black54),
+                  child: RTCVideoView(_remoteRenderer,
+                      mirror: false,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+                ),
+              )
           ]);
         },
       ),
-      floatingActionButton: url != null
-          ? FloatingActionButton(
-              onPressed: _connecting ? _disconnect : _connect,
-              tooltip: _connecting ? 'Hangup' : 'Call',
-              child: Icon(_connecting ? Icons.stop : Icons.play_arrow_sharp),
-            )
-          : Container(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _connecting ? _disconnect : _connect,
+        tooltip: _connecting ? 'Hangup' : 'Call',
+        child: Icon(_connecting ? Icons.stop : Icons.play_arrow_sharp),
+      ),
     );
   }
 }

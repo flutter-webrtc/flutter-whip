@@ -6,7 +6,6 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'route_item.dart';
 import 'pages/publish_sample.dart';
 import 'pages/subscribe_sample.dart';
-import 'pages/qr_scanner.dart';
 
 void main() {
   if (!WebRTC.platformIsWeb) {

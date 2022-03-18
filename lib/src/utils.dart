@@ -20,25 +20,25 @@ class CodecCapability {
     var newFmtp = <dynamic>[];
     var newPayloads = <String>[];
     newCodecs.forEach((element) {
-      var orign_payload = element['orign_payload'] as int;
+      var originPayload = element['orign_payload'] as int;
       var payload = element['payload'] as int;
       // change payload type
-      if (payload != orign_payload) {
+      if (payload != originPayload) {
         newRtcpFb.addAll(rtcpFb.where((e) {
-          if (e['payload'] == orign_payload) {
+          if (e['payload'] == originPayload) {
             e['payload'] = payload;
             return true;
           }
           return false;
         }).toList());
         newFmtp.addAll(fmtp.where((e) {
-          if (e['payload'] == orign_payload) {
+          if (e['payload'] == originPayload) {
             e['payload'] = payload;
             return true;
           }
           return false;
         }).toList());
-        if (payloads.contains('$orign_payload')) {
+        if (payloads.contains('$originPayload')) {
           newPayloads.add('$payload');
         }
       } else {

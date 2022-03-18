@@ -14,10 +14,13 @@ enum WhipState {
   kConnecting,
   kConnected,
   kDisconnected,
+  kFailure,
 }
 
 class WHIP {
   Function(RTCTrackEvent)? onTrack;
+  Function(WhipState)? onState;
+  Object? lastError;
   WhipState state = WhipState.kNew;
   RTCPeerConnection? pc;
   late WhipMode mode;
@@ -51,12 +54,12 @@ class WHIP {
         break;
     }
     log.debug('Initlize whip connection: mode = $mode, stream = ${stream?.id}');
-    state = WhipState.kInitialized;
+    setState(WhipState.kInitialized);
   }
 
   Future<void> connect() async {
     try {
-      state = WhipState.kConnecting;
+      setState(WhipState.kConnecting);
       var desc = await pc!.createOffer();
 
       setPreferredCodec(desc, videoCodec: videoCodec);
@@ -74,11 +77,11 @@ class WHIP {
       final answer = RTCSessionDescription(respose.body, 'answer');
       log.debug('Received answer: ${answer.sdp}');
       await pc!.setRemoteDescription(answer);
-      state = WhipState.kConnected;
+      setState(WhipState.kConnected);
     } catch (e) {
       log.error('connect error: $e');
-      state = WhipState.kDisconnected;
-      rethrow;
+      setState(WhipState.kFailure);
+      lastError = e;
     }
   }
 
@@ -87,9 +90,17 @@ class WHIP {
       return;
     }
     log.debug('Closing whip connection');
-    await httpDelete(Uri.parse(url));
-    state = WhipState.kDisconnected;
     await pc?.close();
+
+    try {
+      await httpDelete(Uri.parse(url));
+    } catch (e) {
+      log.error('connect error: $e');
+      setState(WhipState.kFailure);
+      lastError = e;
+      return;
+    }
+    setState(WhipState.kDisconnected);
   }
 
   void onicecandidate(RTCIceCandidate? candidate) async {
@@ -97,14 +108,25 @@ class WHIP {
       return;
     }
     log.debug('Sending candidate: ${candidate.toMap().toString()}');
-    var respose = await httpPatch(Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/trickle-ice-sdpfrag',
-          if (headers != null) ...headers!
-        },
-        body: candidate.candidate);
-    log.debug('Received Patch response: ${respose.body}');
-    // TODO(cloudwebrtc): Add remote candidate to local pc.
+    try {
+      var respose = await httpPatch(Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/trickle-ice-sdpfrag',
+            if (headers != null) ...headers!
+          },
+          body: candidate.candidate);
+      log.debug('Received Patch response: ${respose.body}');
+      // TODO(cloudwebrtc): Add remote candidate to local pc.
+    } catch (e) {
+      log.error('connect error: $e');
+      setState(WhipState.kFailure);
+      lastError = e;
+    }
+  }
+
+  void setState(WhipState newState) {
+    onState?.call(newState);
+    state = newState;
   }
 
   void setPreferredCodec(RTCSessionDescription description,
