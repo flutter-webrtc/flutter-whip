@@ -25,6 +25,7 @@ class WHIP {
   RTCPeerConnection? pc;
   late WhipMode mode;
   final String url;
+  String? resourceURL;
   Map<String, String>? headers = {};
   String videoCodec = 'vp8';
   WHIP({required this.url, this.headers});
@@ -61,11 +62,8 @@ class WHIP {
     try {
       setState(WhipState.kConnecting);
       var desc = await pc!.createOffer();
-
       setPreferredCodec(desc, videoCodec: videoCodec);
-
       await pc!.setLocalDescription(desc);
-
       var offer = await pc!.getLocalDescription();
       log.debug('Sending offer: $offer');
       var respose = await httpPost(Uri.parse(url),
@@ -74,6 +72,17 @@ class WHIP {
             if (headers != null) ...headers!
           },
           body: offer!.sdp);
+
+      if (respose.statusCode != 200 && respose.statusCode != 201) {
+        throw Exception('Failed to send offer: ${respose.statusCode}');
+      }
+
+      resourceURL = respose.headers['location'];
+      if (resourceURL == null) {
+        throw 'Resource url not found!';
+      }
+
+      log.debug('Resource URL: $resourceURL');
       final answer = RTCSessionDescription(respose.body, 'answer');
       log.debug('Received answer: ${answer.sdp}');
       await pc!.setRemoteDescription(answer);
@@ -91,9 +100,11 @@ class WHIP {
     }
     log.debug('Closing whip connection');
     await pc?.close();
-
     try {
-      await httpDelete(Uri.parse(url));
+      if (resourceURL == null) {
+        throw 'Resource url not found!';
+      }
+      await httpDelete(Uri.parse(resourceURL ?? url));
     } catch (e) {
       log.error('connect error: $e');
       setState(WhipState.kFailure);
@@ -104,12 +115,15 @@ class WHIP {
   }
 
   void onicecandidate(RTCIceCandidate? candidate) async {
+    if (resourceURL == null) {
+      throw 'Resource url not found!';
+    }
     if (candidate == null) {
       return;
     }
     log.debug('Sending candidate: ${candidate.toMap().toString()}');
     try {
-      var respose = await httpPatch(Uri.parse(url),
+      var respose = await httpPatch(Uri.parse(resourceURL!),
           headers: {
             'Content-Type': 'application/trickle-ice-sdpfrag',
             if (headers != null) ...headers!
