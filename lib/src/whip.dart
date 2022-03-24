@@ -41,7 +41,10 @@ class WHIP {
     }
     this.mode = mode;
     pc = await createPeerConnection({'sdpSemantics': 'unified-plan'});
-    pc!.onIceCandidate = onicecandidate;
+    pc?.onIceCandidate = onicecandidate;
+    pc?.onIceConnectionState = (state) {
+      print('state: ${state.toString()}');
+    };
     pc!.onTrack = (RTCTrackEvent event) => onTrack?.call(event);
     switch (mode) {
       case WhipMode.kSend:
@@ -64,14 +67,16 @@ class WHIP {
       var desc = await pc!.createOffer();
       setPreferredCodec(desc, videoCodec: videoCodec);
       await pc!.setLocalDescription(desc);
+
       var offer = await pc!.getLocalDescription();
-      log.debug('Sending offer: $offer');
+      final sdp = offer!.sdp;
+      log.debug('Sending offer: $sdp');
       var respose = await httpPost(Uri.parse(url),
           headers: {
             'Content-Type': 'application/sdp',
             if (headers != null) ...headers!
           },
-          body: offer!.sdp);
+          body: sdp);
 
       if (respose.statusCode != 200 && respose.statusCode != 201) {
         throw Exception('Failed to send offer: ${respose.statusCode}');
@@ -115,10 +120,7 @@ class WHIP {
   }
 
   void onicecandidate(RTCIceCandidate? candidate) async {
-    if (resourceURL == null) {
-      throw 'Resource url not found!';
-    }
-    if (candidate == null) {
+    if (candidate == null || resourceURL == null) {
       return;
     }
     log.debug('Sending candidate: ${candidate.toMap().toString()}');
