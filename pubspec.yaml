@@ -8,7 +8,10 @@ environment:
 dependencies:
   events2: ^1.0.0
   flutter_webrtc: ^0.8.3
-  http: ^0.13.3
+  http:
+     git:
+         url: https://github.com/cloudwebrtc/http.git
+         ref: remove-charset-for-content-type
   sdp_transform: ^0.3.2
   uuid: ^3.0.3 
   web_socket_channel: ^2.0.0
