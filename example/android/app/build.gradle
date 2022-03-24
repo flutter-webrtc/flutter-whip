@@ -36,8 +36,8 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.cloudwebrtc.flutterwhip.example.flutter_whip_example_app"
-        minSdkVersion 21
-        targetSdkVersion 31
+        minSdkVersion 23
+        targetSdkVersion 30
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }

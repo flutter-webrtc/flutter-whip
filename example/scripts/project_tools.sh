@@ -8,7 +8,7 @@ CMD=$1
 function cleanup() {
     echo "Cleanup project [$FLUTTER_APP_PROJECT_NAME] files ..."
     cd $FLUTTER_APP_FOLDER
-    rm -rf android build *.iml ios pubspec.lock test .flutter-plugins .metadata .packages .idea macos web
+    rm -rf android build *.iml ios pubspec.lock test .dart_tool .flutter-plugins* .metadata .packages .idea macos web windows linux
 }
 
 function create() {
@@ -37,7 +37,9 @@ function add_permission_label() {
     echo ""
     echo "Add permission labels to AndroidManifest.xml."
     echo ""
-    python add-line.py -i ../android/app/build.gradle -s 'minSdkVersion 16' -t 'minSdkVersion 21' -r
+    python add-line.py -i ../android/app/build.gradle -s 'minSdkVersion flutter.minSdkVersion' -t 'minSdkVersion 23' -r
+    python add-line.py -i ../android/app/build.gradle -s 'compileSdkVersion flutter.compileSdkVersion' -t 'compileSdkVersion 31' -r
+    python add-line.py -i ../android/app/build.gradle -s 'targetSdkVersion flutter.targetSdkVersion' -t 'targetSdkVersion 30' -r
     python add-line.py -i ../android/app/src/main/AndroidManifest.xml -s "<application" -t '    <uses-permission android:name="android.permission.CAMERA" />'
     python add-line.py -i ../android/app/src/main/AndroidManifest.xml -s "<application" -t '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
     python add-line.py -i ../android/app/src/main/AndroidManifest.xml -s "<application" -t '    <uses-permission android:name="android.permission.WAKE_LOCK" />'
