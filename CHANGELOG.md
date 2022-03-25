@@ -1,6 +1,10 @@
 # Changelog
 
 --------------------------------------------------------------------------------
+[0.5.2] - 2022-03-01
+
+* chore: Update.
+
 [0.5.1] - 2022-03-01
 
 * fix: Get resource URL(Location) from the response headers.
