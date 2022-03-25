@@ -1,11 +1,15 @@
 # Changelog
 
 --------------------------------------------------------------------------------
-[0.5.2] - 2022-03-01
+[0.5.3] - 2022-03-25
+
+* fix: fix sdp negotiation issue.
+
+[0.5.2] - 2022-03-24
 
 * chore: Update.
 
-[0.5.1] - 2022-03-01
+[0.5.1] - 2022-03-24
 
 * fix: Get resource URL(Location) from the response headers.
 
