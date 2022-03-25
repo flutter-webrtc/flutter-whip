@@ -27,7 +27,7 @@ class WHIP {
   final String url;
   String? resourceURL;
   Map<String, String>? headers = {};
-  String videoCodec = 'vp8';
+  String? videoCodec;
   WHIP({required this.url, this.headers});
 
   Future<void> initlize(
@@ -40,7 +40,11 @@ class WHIP {
       this.videoCodec = videoCodec.toLowerCase();
     }
     this.mode = mode;
-    pc = await createPeerConnection({'sdpSemantics': 'unified-plan'});
+    pc = await createPeerConnection({
+      'sdpSemantics': 'unified-plan',
+      'bundlePolicy': 'max-bundle',
+      'rtcpMuxPolicy': 'require',
+    });
     pc?.onIceCandidate = onicecandidate;
     pc?.onIceConnectionState = (state) {
       print('state: ${state.toString()}');
@@ -49,12 +53,24 @@ class WHIP {
     switch (mode) {
       case WhipMode.kSend:
         stream?.getTracks().forEach((track) async {
-          await pc!.addTrack(track, stream);
+          await pc!.addTransceiver(
+              track: track,
+              kind: track.kind == 'audio'
+                  ? RTCRtpMediaType.RTCRtpMediaTypeAudio
+                  : RTCRtpMediaType.RTCRtpMediaTypeVideo,
+              init: RTCRtpTransceiverInit(
+                  direction: TransceiverDirection.SendOnly, streams: [stream]));
         });
         break;
       case WhipMode.kReceive:
-        await pc!.addTransceiver(kind: RTCRtpMediaType.RTCRtpMediaTypeAudio);
-        await pc!.addTransceiver(kind: RTCRtpMediaType.RTCRtpMediaTypeVideo);
+        await pc!.addTransceiver(
+            kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
+            init: RTCRtpTransceiverInit(
+                direction: TransceiverDirection.RecvOnly));
+        await pc!.addTransceiver(
+            kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
+            init: RTCRtpTransceiverInit(
+                direction: TransceiverDirection.RecvOnly));
         break;
     }
     log.debug('Initlize whip connection: mode = $mode, stream = ${stream?.id}');
@@ -64,8 +80,12 @@ class WHIP {
   Future<void> connect() async {
     try {
       setState(WhipState.kConnecting);
-      var desc = await pc!.createOffer();
-      setPreferredCodec(desc, videoCodec: videoCodec);
+      var desc = await pc!.createOffer({});
+
+      if (mode == WhipMode.kSend && videoCodec != null) {
+        setPreferredCodec(desc, videoCodec: videoCodec!);
+      }
+
       await pc!.setLocalDescription(desc);
 
       var offer = await pc!.getLocalDescription();
