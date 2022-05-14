@@ -34,7 +34,7 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
     _preferences = await SharedPreferences.getInstance();
     this.setState(() {
       _serverController.text = _preferences.getString('pullserver') ??
-          'http://localhost:8080/whip/live/stream1';
+          'http://127.0.0.1:8080/whip/live/stream1/subscribe';
     });
   }
 
