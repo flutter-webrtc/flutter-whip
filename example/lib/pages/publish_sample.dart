@@ -44,7 +44,6 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
   void deactivate() {
     super.deactivate();
     _localRenderer.dispose();
-    _saveSettings();
   }
 
   void _saveSettings() {
@@ -62,6 +61,8 @@ class _WhipPublishSampleState extends State<WhipPublishSample> {
     if (url.isEmpty) {
       return;
     }
+
+    _saveSettings();
 
     _whip = WHIP(url: url);
 

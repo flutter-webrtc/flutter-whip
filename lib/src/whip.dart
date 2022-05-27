@@ -102,16 +102,22 @@ class WHIP {
         throw Exception('Failed to send offer: ${respose.statusCode}');
       }
 
-      resourceURL = respose.headers['location'];
-      if (resourceURL == null) {
-        throw 'Resource url not found!';
-      }
-
       log.debug('Resource URL: $resourceURL');
       final answer = RTCSessionDescription(respose.body, 'answer');
       log.debug('Received answer: ${answer.sdp}');
       await pc!.setRemoteDescription(answer);
       setState(WhipState.kConnected);
+
+      resourceURL = respose.headers['location'];
+      if (resourceURL == null) {
+        resourceURL = url;
+        log.warn('Resource url not found, use $url as resource url!');
+      } else {
+        if (resourceURL!.startsWith('/')) {
+          var uri = Uri.parse(url);
+          resourceURL = '${uri.origin}$resourceURL';
+        }
+      }
     } catch (e) {
       log.error('connect error: $e');
       setState(WhipState.kFailure);

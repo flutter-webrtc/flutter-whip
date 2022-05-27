@@ -42,7 +42,6 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
   void deactivate() {
     super.deactivate();
     _remoteRenderer.dispose();
-    _saveSettings();
   }
 
   void _saveSettings() {
@@ -60,6 +59,9 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
     if (url.isEmpty) {
       return;
     }
+
+    _saveSettings();
+
     _whip = WHIP(url: url);
 
     _whip.onState = (WhipState state) {
