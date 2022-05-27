@@ -1,6 +1,11 @@
 # Changelog
 
 --------------------------------------------------------------------------------
+[0.5.4] - 2022-05-27
+
+* fix: fix resource location.
+* chore: bump version for flutter-webrtc.
+
 [0.5.3] - 2022-03-25
 
 * fix: fix sdp negotiation issue.
