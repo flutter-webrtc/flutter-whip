@@ -5,8 +5,6 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_whip/flutter_whip.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'qr_scanner.dart';
-
 class WhipSubscribeSample extends StatefulWidget {
   static String tag = 'whip_subscribe_sample';
 
@@ -122,25 +120,7 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('WHIP Subscribe Sample'), actions: <Widget>[
-        if (!_connecting)
-          IconButton(
-            icon: Icon(Icons.qr_code_scanner_sharp),
-            onPressed: () async {
-              if (!WebRTC.platformIsDesktop) {
-                /// only support mobile for now
-                Future future = Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => QRViewExample()));
-                future.then((value) {
-                  print('QR code result: $value');
-                  this.setState(() {
-                    _serverController.text = value;
-                  });
-                });
-              }
-            },
-          ),
-      ]),
+      appBar: AppBar(title: Text('WHIP Subscribe Sample'), actions: <Widget>[]),
       body: OrientationBuilder(
         builder: (context, orientation) {
           return Column(children: <Widget>[
