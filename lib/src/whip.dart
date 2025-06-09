@@ -25,7 +25,8 @@ class WHIP {
   RTCPeerConnection? pc;
   late WhipMode mode;
   final String url;
-  String? resourceURL;
+  String? _sessionUrl;
+  String? _eTag;
   Map<String, String>? headers = {};
   String? videoCodec;
   WHIP({required this.url, this.headers});
@@ -46,6 +47,7 @@ class WHIP {
       'rtcpMuxPolicy': 'require',
     });
     pc?.onIceCandidate = onicecandidate;
+    pc?.onRenegotiationNeeded = onrenegotiationneeded;
     pc?.onIceConnectionState = (state) {
       print('state: ${state.toString()}');
     };
@@ -99,23 +101,26 @@ class WHIP {
           body: sdp);
 
       if (respose.statusCode != 200 && respose.statusCode != 201) {
-        throw Exception('Failed to send offer: ${respose.statusCode}');
+        throw Exception(
+            'Failed to send offer: ${respose.statusCode}, body ${respose.body}');
       }
 
-      log.debug('Resource URL: $resourceURL');
+      log.debug('Resource URL: $_sessionUrl');
       final answer = RTCSessionDescription(respose.body, 'answer');
       log.debug('Received answer: ${answer.sdp}');
       await pc!.setRemoteDescription(answer);
       setState(WhipState.kConnected);
 
-      resourceURL = respose.headers['location'];
-      if (resourceURL == null) {
-        resourceURL = url;
+      _eTag = respose.headers['etag'];
+
+      _sessionUrl = respose.headers['location'];
+      if (_sessionUrl == null) {
+        _sessionUrl = url;
         log.warn('Resource url not found, use $url as resource url!');
       } else {
-        if (resourceURL!.startsWith('/')) {
+        if (_sessionUrl!.startsWith('/')) {
           var uri = Uri.parse(url);
-          resourceURL = '${uri.origin}$resourceURL';
+          _sessionUrl = '${uri.origin}$_sessionUrl';
         }
       }
     } catch (e) {
@@ -132,10 +137,10 @@ class WHIP {
     log.debug('Closing whip connection');
     await pc?.close();
     try {
-      if (resourceURL == null) {
+      if (_sessionUrl == null) {
         throw 'Resource url not found!';
       }
-      await httpDelete(Uri.parse(resourceURL ?? url));
+      await httpDelete(Uri.parse(_sessionUrl ?? url));
     } catch (e) {
       log.error('connect error: $e');
       setState(WhipState.kFailure);
@@ -145,18 +150,26 @@ class WHIP {
     setState(WhipState.kDisconnected);
   }
 
+  void onrenegotiationneeded() async {
+    log.debug('onRenegotiationNeeded');
+  }
+
   void onicecandidate(RTCIceCandidate? candidate) async {
-    if (candidate == null || resourceURL == null) {
+    if (candidate == null || _sessionUrl == null) {
       return;
     }
     log.debug('Sending candidate: ${candidate.toMap().toString()}');
     try {
-      var respose = await httpPatch(Uri.parse(resourceURL!),
+      var respose = await httpPatch(Uri.parse(_sessionUrl!),
           headers: {
             'Content-Type': 'application/trickle-ice-sdpfrag',
             if (headers != null) ...headers!
           },
           body: candidate.candidate);
+      if (respose.statusCode == 204) {
+        log.debug('Candidate sent successfully');
+        return;
+      }
       log.debug('Received Patch response: ${respose.body}');
       // TODO(cloudwebrtc): Add remote candidate to local pc.
     } catch (e) {

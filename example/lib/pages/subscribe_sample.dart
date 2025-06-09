@@ -129,8 +129,8 @@ class _WhipSubscribeSampleState extends State<WhipSubscribeSample> {
             onPressed: () async {
               if (!WebRTC.platformIsDesktop) {
                 /// only support mobile for now
-                Future future = Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => QRViewExample()));
+                Future future = Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => const QRViewExample()));
                 future.then((value) {
                   print('QR code result: $value');
                   this.setState(() {
