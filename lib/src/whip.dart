@@ -3,10 +3,7 @@ import 'logger.dart';
 import 'transports/http.dart' if (dart.library.html) 'transports/http_web.dart';
 import 'utils.dart';
 
-enum WhipMode {
-  kSend,
-  kReceive,
-}
+enum WhipMode { kSend, kReceive }
 
 enum WhipState {
   kNew,
@@ -25,14 +22,17 @@ class WHIP {
   RTCPeerConnection? pc;
   late WhipMode mode;
   final String url;
-  String? _sessionUrl;
+  String? _resourceUrl;
   String? _eTag;
   Map<String, String>? headers = {};
   String? videoCodec;
   WHIP({required this.url, this.headers});
 
-  Future<void> initlize(
-      {required WhipMode mode, MediaStream? stream, String? videoCodec}) async {
+  Future<void> initlize({
+    required WhipMode mode,
+    MediaStream? stream,
+    String? videoCodec,
+  }) async {
     initHttpClient();
     if (pc != null) {
       return;
@@ -56,23 +56,26 @@ class WHIP {
       case WhipMode.kSend:
         stream?.getTracks().forEach((track) async {
           await pc!.addTransceiver(
-              track: track,
-              kind: track.kind == 'audio'
-                  ? RTCRtpMediaType.RTCRtpMediaTypeAudio
-                  : RTCRtpMediaType.RTCRtpMediaTypeVideo,
-              init: RTCRtpTransceiverInit(
-                  direction: TransceiverDirection.SendOnly, streams: [stream]));
+            track: track,
+            kind: track.kind == 'audio'
+                ? RTCRtpMediaType.RTCRtpMediaTypeAudio
+                : RTCRtpMediaType.RTCRtpMediaTypeVideo,
+            init: RTCRtpTransceiverInit(
+              direction: TransceiverDirection.SendOnly,
+              streams: [stream],
+            ),
+          );
         });
         break;
       case WhipMode.kReceive:
         await pc!.addTransceiver(
-            kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
-            init: RTCRtpTransceiverInit(
-                direction: TransceiverDirection.RecvOnly));
+          kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
+          init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+        );
         await pc!.addTransceiver(
-            kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
-            init: RTCRtpTransceiverInit(
-                direction: TransceiverDirection.RecvOnly));
+          kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
+          init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+        );
         break;
     }
     log.debug('Initlize whip connection: mode = $mode, stream = ${stream?.id}');
@@ -93,19 +96,22 @@ class WHIP {
       var offer = await pc!.getLocalDescription();
       final sdp = offer!.sdp;
       log.debug('Sending offer: $sdp');
-      var respose = await httpPost(Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/sdp',
-            if (headers != null) ...headers!
-          },
-          body: sdp);
+      var respose = await httpPost(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/sdp',
+          if (headers != null) ...headers!,
+        },
+        body: sdp,
+      );
 
       if (respose.statusCode != 200 && respose.statusCode != 201) {
         throw Exception(
-            'Failed to send offer: ${respose.statusCode}, body ${respose.body}');
+          'Failed to send offer: ${respose.statusCode}, body ${respose.body}',
+        );
       }
-
-      log.debug('Resource URL: $_sessionUrl');
+      _resourceUrl = respose.headers['location'];
+      log.debug('Resource URL: $_resourceUrl');
       final answer = RTCSessionDescription(respose.body, 'answer');
       log.debug('Received answer: ${answer.sdp}');
       await pc!.setRemoteDescription(answer);
@@ -113,14 +119,13 @@ class WHIP {
 
       _eTag = respose.headers['etag'];
 
-      _sessionUrl = respose.headers['location'];
-      if (_sessionUrl == null) {
-        _sessionUrl = url;
+      if (_resourceUrl == null) {
+        _resourceUrl = url;
         log.warn('Resource url not found, use $url as resource url!');
       } else {
-        if (_sessionUrl!.startsWith('/')) {
+        if (_resourceUrl!.startsWith('/')) {
           var uri = Uri.parse(url);
-          _sessionUrl = '${uri.origin}$_sessionUrl';
+          _resourceUrl = '${uri.origin}$_resourceUrl';
         }
       }
     } catch (e) {
@@ -137,10 +142,10 @@ class WHIP {
     log.debug('Closing whip connection');
     await pc?.close();
     try {
-      if (_sessionUrl == null) {
-        throw 'Resource url not found!';
+      if (_resourceUrl == null) {
+        throw Exception('Resource url not found!');
       }
-      await httpDelete(Uri.parse(_sessionUrl ?? url));
+      await httpDelete(Uri.parse(_resourceUrl ?? url));
     } catch (e) {
       log.error('connect error: $e');
       setState(WhipState.kFailure);
@@ -155,17 +160,19 @@ class WHIP {
   }
 
   void onicecandidate(RTCIceCandidate? candidate) async {
-    if (candidate == null || _sessionUrl == null) {
+    if (candidate == null || _resourceUrl == null) {
       return;
     }
     log.debug('Sending candidate: ${candidate.toMap().toString()}');
     try {
-      var respose = await httpPatch(Uri.parse(_sessionUrl!),
-          headers: {
-            'Content-Type': 'application/trickle-ice-sdpfrag',
-            if (headers != null) ...headers!
-          },
-          body: candidate.candidate);
+      var respose = await httpPatch(
+        Uri.parse(_resourceUrl!),
+        headers: {
+          'Content-Type': 'application/trickle-ice-sdpfrag',
+          if (headers != null) ...headers!,
+        },
+        body: candidate.candidate,
+      );
       if (respose.statusCode == 204) {
         log.debug('Candidate sent successfully');
         return;
@@ -184,8 +191,11 @@ class WHIP {
     state = newState;
   }
 
-  void setPreferredCodec(RTCSessionDescription description,
-      {String audioCodec = 'opus', String videoCodec = 'vp8'}) {
+  void setPreferredCodec(
+    RTCSessionDescription description, {
+    String audioCodec = 'opus',
+    String videoCodec = 'vp8',
+  }) {
     var capSel = CodecCapabilitySelector(description.sdp!);
     var acaps = capSel.getCapabilities('audio');
     if (acaps != null) {
