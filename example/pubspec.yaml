@@ -13,10 +13,7 @@ dependencies:
   flutter_whip:
     path: ../
   lints: ^2.1.1
-  qr_code_scanner:
-    git:
-      url: https://github.com/flutter-webrtc/qr_code_scanner.git
-      ref: fix/build-error-for-web
+  qr_code_scanner_plus: ^2.0.10+1
   shared_preferences: ^2.0.5
 
 dev_dependencies:
